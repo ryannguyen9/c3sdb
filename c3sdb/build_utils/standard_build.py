@@ -9,8 +9,13 @@
     - creates files:
         - `C3S.db`: database
         - `smiles_search_cache.json`: cached values for searching for SMILES structures
+        - `C3S_clean.db`: cleaned database 
 """
 
+# TODO
+# need to calculate mqns for C3S_clean
+# add in new dataset
+# re-train model
 
 import sqlite3
 import os
@@ -20,21 +25,43 @@ import requests
 from c3sdb.build_utils.db_init import create_db
 from c3sdb.build_utils.src_data import add_dataset
 from c3sdb.build_utils.smiles import (
-    load_smiles_search_cache, save_smiles_search_cache, add_smiles_to_db
+    load_smiles_search_cache,
+    save_smiles_search_cache,
+    add_smiles_to_db,
 )
 from c3sdb.build_utils.mqns import add_mqns_to_db
 from c3sdb.build_utils.classification import label_class_byname
+from c3sdb.build_utils.clean_src import clean_database
 
 
 # source datasets to include
 _SRC_TAGS = [
-    "zhou1016", "zhou0817", "zhen0917", "pagl0314", "righ0218", 
-    "nich1118", "may_0114", "moll0218", "hine1217", "hine0217", 
-    "hine0817", "groe0815", "bijl0517", "stow0817", "hine0119", 
-    "leap0219", "blaz0818", 
-    "vasi0120",
-    "tsug0220", "lian0118", "teja0918", "pola0620", "dodd0220",
-    "celm1120", "belo0321", "ross0422"
+    "zhou1016",
+    "zhou0817",
+    "zhen0917",
+    "pagl0314",
+    "righ0218",
+    "nich1118",
+    "may_0114",
+    "moll0218",
+    "hine1217",
+    "hine0217",
+    "hine0817",
+    "groe0815",
+    "bijl0517",
+    "stow0817",
+    "hine0119",
+    "leap0219",
+    "blaz0818",
+    # "vasi0120",
+    "tsug0220",
+    "lian0118",
+    "teja0918",
+    "pola0620",
+    "dodd0220",
+    "celm1120",
+    "belo0321",
+    "ross0422",
 ]
 
 
@@ -51,22 +78,24 @@ def _main():
     # add source datasets
     print("adding source datasets ...")
     n_entries = 0
-    for src_tag in _SRC_TAGS:  
+    for src_tag in _SRC_TAGS:
         n_added = add_dataset(cur, src_tag)
         n_entries += n_added
         print(f"\tsrc_tag: {src_tag} n_added: {n_added}")
     print(f"\ttotal entries: {n_entries}")
     print("... done")
-    # add SMILES structures 
+    # add SMILES structures
     print("adding SMILES structures ...")
     smiles_cache_file = "smiles_search_cache.json"
-    # if a local copy of the SMILES search cache does not exist, grab the 
+    # if a local copy of the SMILES search cache does not exist, grab the
     # built-in copy from the package
     if not os.path.isfile(smiles_cache_file):
         smiles_search_cache = load_smiles_search_cache(cache_file_name=None)
     else:
         # load the local copy if it exists
-        smiles_search_cache = load_smiles_search_cache(cache_file_name=smiles_cache_file)
+        smiles_search_cache = load_smiles_search_cache(
+            cache_file_name=smiles_cache_file
+        )
     sess = requests.Session()
     n_smiles, n_requests = add_smiles_to_db(cur, sess, smiles_search_cache)
     print(f"\tSMILES structures added: {n_smiles}")
@@ -74,7 +103,7 @@ def _main():
     print("... done")
     # save the search cache
     save_smiles_search_cache(smiles_search_cache, smiles_cache_file)
-    # add MQNs 
+    # add MQNs
     print("adding MQNs to database entries ...")
     n_mqns = add_mqns_to_db(cur)
     print(f"\tentries with MQNs: {n_mqns}")
@@ -86,6 +115,8 @@ def _main():
     # commit changes to database and close
     con.commit()
     con.close()
+    # clean database
+    clean_database("C3S.db", "C3S_clean.db")
 
 
 if __name__ == "__main__":
